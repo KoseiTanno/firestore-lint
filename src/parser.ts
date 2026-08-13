@@ -168,34 +168,35 @@ export function parse(source: string): RulesAST {
     matches: MatchNode[]
     functions: FunctionNode[]
     allows?: AllowNode[]
-    }): void {
+  }): void {
     while (peek().type !== 'eof' && !isValue('}')) {
-        if (isValue('match')) {
+      if (isValue('match')) {
         container.matches.push(parseMatch())
-        } else if (isValue('allow')) {
+      } else if (isValue('allow')) {
         const allow = parseAllow()
         if (allow && container.allows) {
-            container.allows.push(allow)
+          container.allows.push(allow)
         } else if (allow) {
-            errors.push({
-            message: "'allow' is not permitted directly under a service; nest it inside a match block",
+          errors.push({
+            message:
+              "'allow' is not permitted directly under a service; nest it inside a match block",
             line: allow.line,
             column: allow.column,
-            })
+          })
         }
-        } else if (isValue('function')) {
+      } else if (isValue('function')) {
         container.functions.push(parseFunction())
-        } else {
+      } else {
         errors.push({
-            message: `unexpected token '${peek().value}'`,
-            line: peek().line,
-            column: peek().column,
+          message: `unexpected token '${peek().value}'`,
+          line: peek().line,
+          column: peek().column,
         })
         recover()
-        }
+      }
     }
     expect('}')
-    }
+  }
 
   function parseService(): ServiceNode {
     const line = peek().line
