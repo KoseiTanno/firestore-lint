@@ -1,6 +1,6 @@
 {
   "name": "firestore-lint",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Static analysis linter for Firebase Firestore and Storage security rules",
   "type": "module",
   "main": "./dist/index.mjs",
