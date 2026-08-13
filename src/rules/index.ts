@@ -1,7 +1,14 @@
 import type { Rule } from '../types.js'
 import { noAuthOnlyRead } from './no-auth-only-read.js'
+import { noExpiredTestMode } from './no-expired-test-mode.js'
 import { noPublicRead } from './no-public-read.js'
 import { noWildcardWrite } from './no-wildcard-write.js'
 import { requireAuthCheck } from './require-auth-check.js'
 
-export const rules: Rule[] = [noPublicRead, requireAuthCheck, noAuthOnlyRead, noWildcardWrite]
+export const rules: Rule[] = [
+  noPublicRead,
+  requireAuthCheck,
+  noAuthOnlyRead,
+  noWildcardWrite,
+  noExpiredTestMode,
+]
