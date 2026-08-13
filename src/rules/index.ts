@@ -1,4 +1,5 @@
 import type { Rule } from '../types.js'
+import { limitGetCalls } from './limit-get-calls.js'
 import { noAuthOnlyRead } from './no-auth-only-read.js'
 import { noExpiredTestMode } from './no-expired-test-mode.js'
 import { noPublicRead } from './no-public-read.js'
@@ -11,4 +12,5 @@ export const rules: Rule[] = [
   noAuthOnlyRead,
   noWildcardWrite,
   noExpiredTestMode,
+  limitGetCalls,
 ]
