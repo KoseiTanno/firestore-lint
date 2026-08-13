@@ -1,4 +1,4 @@
-import type { Diagnostic, Rule } from '../types.js'
+import type { Rule } from '../types.js'
 
 export const requireRulesVersion: Rule = {
   id: 'require-rules-version',
