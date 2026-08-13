@@ -3,16 +3,16 @@
   "version": "0.0.0",
   "description": "Static analysis linter for Firebase Firestore and Storage security rules",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "types": "./dist/index.d.mts",
+      "default": "./dist/index.mjs"
     }
   },
   "bin": {
-    "firestore-lint": "./dist/cli.js"
+    "firestore-lint": "./dist/cli.mjs"
   },
   "files": [
     "dist"
