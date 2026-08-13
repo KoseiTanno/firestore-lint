@@ -6,6 +6,7 @@ import { noPublicRead } from './no-public-read.js'
 import { noWildcardWrite } from './no-wildcard-write.js'
 import { preferGranularWrite } from './prefer-granular-write.js'
 import { requireAuthCheck } from './require-auth-check.js'
+import { requireRulesVersion } from './require-rules-version.js'
 
 export const rules: Rule[] = [
   noPublicRead,
@@ -15,4 +16,5 @@ export const rules: Rule[] = [
   noExpiredTestMode,
   limitGetCalls,
   preferGranularWrite,
+  requireRulesVersion,
 ]
