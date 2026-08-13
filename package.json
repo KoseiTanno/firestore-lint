@@ -1,0 +1,54 @@
+{
+  "name": "firestore-lint",
+  "version": "0.0.0",
+  "description": "Static analysis linter for Firebase Firestore and Storage security rules",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "firestore-lint": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@11.21.0",
+  "scripts": {
+    "build": "tsdown",
+    "test": "pnpm build && vitest run",
+    "test:cov": "pnpm build && vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome check --write ."
+  },
+  "keywords": [
+    "firebase",
+    "firestore",
+    "security-rules",
+    "linter",
+    "static-analysis",
+    "cli"
+  ],
+  "author": "Kosei Tanno",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KoseiTanno/firestore-lint.git"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.8",
+    "@types/node": "26.2.0",
+    "@vitest/coverage-v8": "4.1.10",
+    "tsdown": "0.22.14",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  }
+}

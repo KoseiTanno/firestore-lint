@@ -1,0 +1,146 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // users:
+    // - 本人は読み書き可
+    // - 同じグループに所属しているユーザー同士は読み可（displayName 等を相互参照するため）
+    //   ※ pushToken など機微情報も含まれるが、グループメンバーは「起こす」「寝坊通知」で
+    //     相互に送信先トークンが必要になる場面が出てくるため、現フェーズでは読み許可とする。
+    //     より厳格にしたい場合は将来サブコレクション化で機微情報を分離する。
+    match /users/{userId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == userId ||
+        // 同じグループに所属しているか確認
+        (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.groupIds.size() > 0 &&
+          get(/databases/$(database)/documents/users/$(userId)).data.groupIds.hasAny(
+            get(/databases/$(database)/documents/users/$(request.auth.uid)).data.groupIds
+          )
+        )
+      );
+      // サインアップ時の初回 doc 作成: 本人 uid 一致 + groupIds は空のみ許可。
+      // （create でも groupIds を縛らないと、新規アカウント作成時に他人のグループIDを
+      //   自己注入して同グループ判定を悪用し、そのグループ全員の pushToken を read できてしまう）
+      allow create: if request.auth != null &&
+        request.auth.uid == userId &&
+        (!('groupIds' in request.resource.data) || request.resource.data.groupIds.size() == 0);
+      // プロフィール更新: 本人のみ、かつ書き換え可能フィールドのみ許可。
+      // groupIds / email / createdAt は Cloud Functions のみ変更可（クライアントから凍結）。
+      allow update: if request.auth != null &&
+        request.auth.uid == userId &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'displayName',
+          'photoURL',
+          'pushToken',
+          'defaultWakeChallenge',
+          'wakeTemplates',
+          'weeklySchedule',
+          'defaultGraceMinutes',
+          'chatReads',
+          'nightlyReminderEnabled',
+          'nightlyReminder',
+          'eulaAcceptedAt',
+          'alarmsMigratedAt'
+        ]);
+
+      // ブロック一覧: 本人のみ読み書き。ブロック相手の uid を doc id にする。
+      match /blocked/{targetId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+
+      // 設定層: 保存アラーム一覧。本人のみ read/write。発火層 participant とは別物。
+      match /alarms/{alarmId} {
+        allow read: if request.auth != null && request.auth.uid == userId;
+        allow create, update: if request.auth != null &&
+          request.auth.uid == userId &&
+          request.resource.data.time is map &&
+          request.resource.data.enabled is bool &&
+          request.resource.data.repeat is map &&
+          request.resource.data.targetGroupId is string &&
+          request.resource.data.targetGroupId.size() > 0;
+        allow delete: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // groups: members に含まれるユーザーのみ読み取り可。
+    // create / update はすべて Cloud Functions 経由（クライアント直書き無し）。
+    match /groups/{groupId} {
+      allow read: if request.auth != null && request.auth.uid in resource.data.members;
+      allow create: if false;
+      allow update: if false;
+    }
+
+    // groups/{gid}/alarms/{date}: グループメンバーのみ読み書き可。
+    match /groups/{groupId}/alarms/{date} {
+      allow read, write: if request.auth != null &&
+        get(/databases/$(database)/documents/groups/$(groupId)).data.members.hasAny([request.auth.uid]);
+    }
+
+    // groups/{gid}/alarms/{date}/participants/{uid}:
+    // - メンバーは全員読める
+    // - 書けるのは「自分自身のドキュメント」かつ「グループメンバー」のみ
+    // - status / wokeUpAt / notifiedAt は Cloud Functions (markWokeUp /
+    //   checkOverslept / wakeUpMember) からのみ更新可。クライアントから
+    //   直接 status='woke_up' に書き換えてチャレンジをスキップする抜け道を塞ぐ。
+    //   (Admin SDK はルールバイパスするので Cloud Functions 側の更新は通る)
+    // - 削除はサーバーサイド（Cloud Functions）のみ
+    match /groups/{groupId}/alarms/{date}/participants/{userId} {
+      allow read: if request.auth != null &&
+        get(/databases/$(database)/documents/groups/$(groupId)).data.members.hasAny([request.auth.uid]);
+      // 作成は本人 + グループメンバー
+      allow create: if request.auth != null &&
+        request.auth.uid == userId &&
+        get(/databases/$(database)/documents/groups/$(groupId)).data.members.hasAny([request.auth.uid]);
+      // 更新は本人 + グループメンバー かつ status/wokeUpAt/notifiedAt を含まないときのみ
+      // （これらは Cloud Functions 経由でのみ変更可能）
+      allow update: if request.auth != null &&
+        request.auth.uid == userId &&
+        get(/databases/$(database)/documents/groups/$(groupId)).data.members.hasAny([request.auth.uid]) &&
+        !('status' in request.resource.data.diff(resource.data).affectedKeys()) &&
+        !('wokeUpAt' in request.resource.data.diff(resource.data).affectedKeys()) &&
+        !('notifiedAt' in request.resource.data.diff(resource.data).affectedKeys());
+      // 削除はサーバーサイド（Cloud Functions）のみ
+      allow delete: if false;
+    }
+
+    // groups/{gid}/messages/{messageId}: グループチャット。
+    // - 読み書きは自グループメンバーのみ（members に含まれるか get で確認）
+    // - 作成は本人 uid を名乗る書き込みのみ。スキーマ / 文字数 / serverTimestamp を検証
+    //   （なりすまし・余計なフィールド注入・時刻詐称・巨大ペイロードを遮断）
+    // - 編集・削除は不可（v1 はイミュータブル）
+    match /groups/{groupId}/messages/{messageId} {
+      allow read: if request.auth != null &&
+        get(/databases/$(database)/documents/groups/$(groupId)).data.members.hasAny([request.auth.uid]);
+      allow create: if request.auth != null &&
+        get(/databases/$(database)/documents/groups/$(groupId)).data.members.hasAny([request.auth.uid]) &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.keys().hasOnly(['uid', 'displayName', 'photoURL', 'text', 'createdAt']) &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() > 0 &&
+        request.resource.data.text.size() <= 2000 &&
+        request.resource.data.displayName is string &&
+        request.resource.data.displayName.size() <= 100 &&
+        request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+
+    // events: クライアント計測イベント（ファネル分析用、src/lib/analytics.ts の logEvent）。
+    // - create のみ許可。自分の uid を名乗っている書き込みだけ受け付ける（なりすまし防止）
+    // - read / update / delete はクライアントから一切不可（集計はコンソール / Admin SDK で行う）
+    match /events/{eventId} {
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['name', 'params', 'uid', 'createdAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 50
+        && request.resource.data.params is map;
+      allow read, update, delete: if false;
+    }
+
+    // reports: 通報ログ。クライアントは一切アクセス不可（reportMessage 関数が Admin SDK で書く）。
+    match /reports/{reportId} {
+      allow read, write: if false;
+    }
+  }
+}
