@@ -4,6 +4,7 @@ import { noAuthOnlyRead } from './no-auth-only-read.js'
 import { noExpiredTestMode } from './no-expired-test-mode.js'
 import { noPublicRead } from './no-public-read.js'
 import { noWildcardWrite } from './no-wildcard-write.js'
+import { preferGranularWrite } from './prefer-granular-write.js'
 import { requireAuthCheck } from './require-auth-check.js'
 
 export const rules: Rule[] = [
@@ -13,4 +14,5 @@ export const rules: Rule[] = [
   noWildcardWrite,
   noExpiredTestMode,
   limitGetCalls,
+  preferGranularWrite,
 ]
