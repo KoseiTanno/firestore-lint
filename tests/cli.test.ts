@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -83,9 +83,10 @@ describe('cli', () => {
     expect(code).toBe(1)
   })
 
-  it('prints the version with --version', async () => {
+  it('prints the version from package.json', async () => {
+    const pkg = JSON.parse(await readFile('package.json', 'utf8'))
     const { stdout, code } = await cli(['--version'])
     expect(code).toBe(0)
-    expect(stdout).toMatch(/\d+\.\d+\.\d+/)
+    expect(stdout.trim()).toBe(pkg.version)
   })
 })

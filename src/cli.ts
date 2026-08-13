@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { parseArgs } from 'node:util'
 import { lint } from './linter.js'
@@ -7,7 +8,11 @@ import { formatPretty } from './reporters/pretty.js'
 import { rules } from './rules/index.js'
 import type { Diagnostic } from './types.js'
 
-const VERSION = '0.0.0'
+// Read the version from package.json rather than hardcoding it, so a release
+// can never ship a CLI that reports a stale version number.
+const VERSION: string = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+).version
 
 function printHelp(): void {
   process.stdout.write(`firestore-lint [options] <file...>
